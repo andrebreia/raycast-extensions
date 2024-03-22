@@ -26,7 +26,7 @@ interface TimezoneBuddy {
 const ALL_TIMEZONES = Intl.supportedValuesOf("timeZone");
 
 function formatZoneName(zoneName: string): string {
-  return zoneName.replaceAll("/", " - ").replaceAll("_", " ");
+  return zoneName.replaceAll("_", " ");
 }
 
 function getCurrentTimeForTz(tz: string): string {
@@ -36,6 +36,34 @@ function getCurrentTimeForTz(tz: string): string {
     minute: "numeric",
   });
   return formatter.format(new Date());
+}
+
+function getCurrentDateTimeForTz(tz: string): string {
+  const formatter = new Intl.DateTimeFormat([], {
+    timeZone: tz,
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    second: "numeric",
+  });
+  return formatter.format(new Date());
+}
+
+function getOffsetForTz(tz: string): string {
+  const tzDateString = getCurrentDateTimeForTz(tz);
+  const localDateString = getCurrentDateTimeForTz(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const tzDate = new Date(tzDateString);
+  const localDate = new Date(localDateString);
+  const diff = tzDate.getTime() - localDate.getTime();
+  const offset = Math.floor(diff / 3600000);
+
+  return offset === 0
+    ? "has the same Time"
+    : offset > 0
+      ? `is ${offset} hours ahead`
+      : `is ${offset * -1} hours behind`;
 }
 
 function getHourForTz(tz: string): number {
@@ -81,7 +109,7 @@ function CreateBuddyForm(props: { onCreate: (buddy: TimezoneBuddy) => void }): J
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Add Buddy" onSubmit={handleSubmit} />
+          <Action.SubmitForm title="Add Buddy" onSubmit={handleSubmit} icon={Icon.AddPerson} />
         </ActionPanel>
       }
     >
@@ -147,7 +175,7 @@ function EditBuddyForm(props: {
     <Form
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Update Buddy" onSubmit={handleSubmit} />
+          <Action.SubmitForm title="Update Buddy" onSubmit={handleSubmit} icon={Icon.Pencil} />
         </ActionPanel>
       }
     >
@@ -182,7 +210,7 @@ function EditBuddyForm(props: {
 function CreateBuddyAction(props: { onCreate: (buddy: TimezoneBuddy) => void }) {
   return (
     <Action.Push
-      icon={Icon.Plus}
+      icon={Icon.AddPerson}
       title="Add Buddy"
       shortcut={{ modifiers: ["cmd"], key: "n" }}
       target={<CreateBuddyForm onCreate={props.onCreate} />}
@@ -198,7 +226,7 @@ function EditBuddyAction(props: {
   return (
     <Action.Push
       icon={Icon.Pencil}
-      title="Edit Buddy"
+      title={'Edit "' + props.buddy.name + '"'}
       shortcut={{ modifiers: ["cmd"], key: "e" }}
       target={<EditBuddyForm buddy={props.buddy} index={props.index} onUpdate={props.onUpdate} />}
     />
@@ -210,6 +238,7 @@ function DeleteBuddyAction(props: { onDelete: () => void }) {
     <Action
       icon={Icon.Trash}
       title="Delete Buddy"
+      style={Action.Style.Destructive}
       shortcut={{ modifiers: ["ctrl"], key: "x" }}
       onAction={props.onDelete}
     />
@@ -381,9 +410,12 @@ export default function Command() {
           <List.Item
             key={index}
             title={buddy.name}
-            subtitle={formatZoneName(buddy.tz)}
+            subtitle={getOffsetForTz(buddy.tz)}
             icon={{ source: buddy.avatar, mask: Image.Mask.Circle }}
             accessories={[
+              {
+                text: formatZoneName(buddy.tz),
+              },
               {
                 tag: {
                   value: getCurrentTimeForTz(buddy.tz),
