@@ -98,8 +98,80 @@ function CreateBuddyForm(props: { onCreate: (buddy: TimezoneBuddy) => void }): J
           }
         }}
       />
-      <Form.TextField id="twitter_handle" title="Twitter/X handle" />
+      <Form.TextField id="twitter_handle" title="Twitter/X handle (optional)" info="Used to fetch profile images" />
       <Form.Dropdown id="timezone" title="Select Timezone">
+        {allTimezones &&
+          allTimezones.map((tz: string) => <Form.Dropdown.Item value={tz} key={tz} title={formatZoneName(tz)} />)}
+      </Form.Dropdown>
+    </Form>
+  );
+}
+
+function EditBuddyForm(props: {
+  buddy: TimezoneBuddy;
+  index: number;
+  onUpdate: (buddy: TimezoneBuddy, index: number) => void;
+}): JSX.Element {
+  const { pop } = useNavigation();
+  const allTimezones = useMemo(() => ALL_TIMEZONES, []);
+  const [nameError, setNameError] = useState<string | undefined>();
+  const nameRequiredError = "The name field is required";
+
+  function dropNameErrorIfNeeded() {
+    if (nameError && nameError.length > 0) {
+      setNameError(undefined);
+    }
+  }
+
+  function handleSubmit(values: { name: string; twitter_handle: string; timezone: string }): void {
+    if (values.name?.length == 0) {
+      setNameError(nameRequiredError);
+      return;
+    }
+
+    props.onUpdate(
+      {
+        name: values.name,
+        twitter_handle: values.twitter_handle || "",
+        tz: values.timezone,
+        avatar: values.twitter_handle
+          ? `https://unavatar.io/twitter/${values.twitter_handle}?fallback=https://source.boringavatars.com/beam/${values.twitter_handle}`
+          : getAvatarIcon(values.name),
+      },
+      props.index,
+    );
+    pop();
+  }
+
+  return (
+    <Form
+      actions={
+        <ActionPanel>
+          <Action.SubmitForm title="Update Buddy" onSubmit={handleSubmit} />
+        </ActionPanel>
+      }
+    >
+      <Form.TextField
+        id="name"
+        title="Name"
+        defaultValue={props.buddy.name}
+        error={nameError}
+        onChange={dropNameErrorIfNeeded}
+        onBlur={(event) => {
+          if (event.target.value?.length == 0) {
+            setNameError(nameRequiredError);
+          } else {
+            dropNameErrorIfNeeded();
+          }
+        }}
+      />
+      <Form.TextField
+        id="twitter_handle"
+        title="Twitter/X handle (optional)"
+        info="Used to fetch profile images"
+        defaultValue={props.buddy.twitter_handle}
+      />
+      <Form.Dropdown id="timezone" title="Select Timezone" defaultValue={props.buddy.tz}>
         {allTimezones &&
           allTimezones.map((tz: string) => <Form.Dropdown.Item value={tz} key={tz} title={formatZoneName(tz)} />)}
       </Form.Dropdown>
@@ -110,10 +182,25 @@ function CreateBuddyForm(props: { onCreate: (buddy: TimezoneBuddy) => void }): J
 function CreateBuddyAction(props: { onCreate: (buddy: TimezoneBuddy) => void }) {
   return (
     <Action.Push
-      icon={Icon.Pencil}
+      icon={Icon.Plus}
       title="Add Buddy"
       shortcut={{ modifiers: ["cmd"], key: "n" }}
       target={<CreateBuddyForm onCreate={props.onCreate} />}
+    />
+  );
+}
+
+function EditBuddyAction(props: {
+  index: number;
+  buddy: TimezoneBuddy;
+  onUpdate: (buddy: TimezoneBuddy, index: number) => void;
+}) {
+  return (
+    <Action.Push
+      icon={Icon.Pencil}
+      title="Edit Buddy"
+      shortcut={{ modifiers: ["cmd"], key: "e" }}
+      target={<EditBuddyForm buddy={props.buddy} index={props.index} onUpdate={props.onUpdate} />}
     />
   );
 }
@@ -218,6 +305,29 @@ export default function Command() {
     }
   }
 
+  async function handleUpdate(buddy: TimezoneBuddy, index: number) {
+    const toast = await showToast({
+      style: Toast.Style.Animated,
+      title: "Updating buddy...",
+    });
+    console.log(buddy, index);
+    try {
+      const newBuddies = [...buddies];
+      newBuddies.splice(index, 1, buddy);
+      setBuddies(newBuddies);
+      await LocalStorage.setItem("buddies", JSON.stringify(newBuddies));
+
+      toast.style = Toast.Style.Success;
+      toast.title = "Buddy updated";
+    } catch (err) {
+      toast.style = Toast.Style.Failure;
+      toast.title = "Failed to update buddy";
+      if (err instanceof Error) {
+        toast.message = err.message;
+      }
+    }
+  }
+
   async function handleDelete(index: number) {
     if (
       await confirmAlert({
@@ -287,6 +397,7 @@ export default function Command() {
               <ActionPanel>
                 <ActionPanel.Section>
                   <CreateBuddyAction onCreate={handleCreate} />
+                  <EditBuddyAction index={index} buddy={buddy} onUpdate={handleUpdate} />
                   <DeleteBuddyAction onDelete={() => handleDelete(index)} />
                 </ActionPanel.Section>
               </ActionPanel>
