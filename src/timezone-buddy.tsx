@@ -1,7 +1,6 @@
 import {
   Action,
   ActionPanel,
-  Color,
   Form,
   Icon,
   List,
@@ -15,66 +14,15 @@ import {
 } from "@raycast/api";
 import { getAvatarIcon } from "@raycast/utils";
 import { useEffect, useMemo, useState } from "react";
-
-interface TimezoneBuddy {
-  name: string;
-  twitter_handle?: string;
-  tz: string;
-  avatar: string;
-}
+import { getCurrentTimeForTz } from "./helpers/getCurrentTimeForTz";
+import { getOffsetForTz } from "./helpers/getOffsetForTz";
+import { formatZoneName } from "./helpers/formatZoneName";
+import { getTooltipForTz } from "./helpers/getTooltipForTz";
+import { TimezoneBuddy } from "./interfaces/TimezoneBuddy";
+import { getColorForTz } from "./helpers/getColorForTz";
+import { getIconForTz } from "./helpers/getIconForTz";
 
 const ALL_TIMEZONES = Intl.supportedValuesOf("timeZone");
-
-function formatZoneName(zoneName: string): string {
-  return zoneName.replaceAll("_", " ");
-}
-
-function getCurrentTimeForTz(tz: string): string {
-  const formatter = new Intl.DateTimeFormat([], {
-    timeZone: tz,
-    hour: "numeric",
-    minute: "numeric",
-  });
-  return formatter.format(new Date());
-}
-
-function getCurrentDateTimeForTz(tz: string): string {
-  const formatter = new Intl.DateTimeFormat([], {
-    timeZone: tz,
-    day: "numeric",
-    month: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "numeric",
-    second: "numeric",
-  });
-  return formatter.format(new Date());
-}
-
-function getOffsetForTz(tz: string): string {
-  const tzDateString = getCurrentDateTimeForTz(tz);
-  const localDateString = getCurrentDateTimeForTz(Intl.DateTimeFormat().resolvedOptions().timeZone);
-  const tzDate = new Date(tzDateString);
-  const localDate = new Date(localDateString);
-  const diff = tzDate.getTime() - localDate.getTime();
-  const offset = Math.floor(diff / 3600000);
-
-  return offset === 0
-    ? "has the same Time"
-    : offset > 0
-      ? `is ${offset} hours ahead`
-      : `is ${offset * -1} hours behind`;
-}
-
-function getHourForTz(tz: string): number {
-  const formatter = new Intl.DateTimeFormat(["en-GB"], {
-    timeZone: tz,
-    hour: "numeric",
-    hour12: false,
-  });
-
-  return Number(formatter.format(new Date()));
-}
 
 function CreateBuddyForm(props: { onCreate: (buddy: TimezoneBuddy) => void }): JSX.Element {
   const { pop } = useNavigation();
@@ -243,55 +191,6 @@ function DeleteBuddyAction(props: { onDelete: () => void }) {
       onAction={props.onDelete}
     />
   );
-}
-
-function getIconForTz(tz: string) {
-  const hour = getHourForTz(tz);
-  if ((hour >= 8 && hour < 9) || (hour >= 19 && hour < 23)) {
-    return Icon.Warning;
-  }
-
-  if (hour >= 23 || hour <= 7) {
-    return Icon.Moon;
-  }
-
-  return Icon.Emoji;
-}
-
-function getColorForTz(tz: string) {
-  const hour = getHourForTz(tz);
-
-  if ((hour >= 8 && hour < 9) || (hour >= 19 && hour < 23)) {
-    return Color.Yellow;
-  }
-
-  if (hour >= 23 || hour <= 7) {
-    return Color.Red;
-  }
-
-  return Color.Green;
-}
-
-function getTooltipForTz(tz: string) {
-  const hour = getHourForTz(tz);
-
-  if (hour >= 5 && hour <= 7) {
-    return "It's early, they might be sleeping";
-  }
-
-  if (hour >= 8 && hour < 9) {
-    return "It's early, they might be busy";
-  }
-
-  if (hour >= 9 && hour <= 18) {
-    return "It's a good time to reach out";
-  }
-
-  if (hour >= 19 && hour < 23) {
-    return "It's getting late, they might be busy";
-  }
-
-  return "It's late, they might be sleeping";
 }
 
 export default function Command() {
