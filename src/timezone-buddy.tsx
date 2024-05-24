@@ -11,9 +11,10 @@ import {
   showToast,
   Toast,
   Image,
+  Color,
 } from "@raycast/api";
 import { getAvatarIcon } from "@raycast/utils";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getCurrentTimeForTz } from "./helpers/getCurrentTimeForTz";
 import { getOffsetForTz } from "./helpers/getOffsetForTz";
 import { formatZoneName } from "./helpers/formatZoneName";
@@ -21,7 +22,6 @@ import { getTooltipForTz } from "./helpers/getTooltipForTz";
 import { TimezoneBuddy } from "./interfaces/TimezoneBuddy";
 import { getColorForTz } from "./helpers/getColorForTz";
 import { getIconForTz } from "./helpers/getIconForTz";
-import { generateGuid } from "./helpers/guid";
 
 const ALL_TIMEZONES = Intl.supportedValuesOf("timeZone");
 
@@ -198,11 +198,6 @@ export default function Command() {
   const [buddies, setBuddies] = useState<TimezoneBuddy[]>([]);
   const [loading, setLoading] = useState(true);
 
-  async function updateBuddies(newBuddies: TimezoneBuddy[]) {
-    setBuddies(newBuddies);
-    await LocalStorage.setItem("buddies", JSON.stringify(newBuddies));
-  }
-
   useEffect(() => {
     async function getBuddies() {
       const buddies = await LocalStorage.getItem<string>("buddies");
@@ -224,9 +219,9 @@ export default function Command() {
     });
 
     try {
-      buddy.id = generateGuid();
       const newBuddies = [...buddies, buddy];
-      updateBuddies(newBuddies);
+      setBuddies(newBuddies);
+      await LocalStorage.setItem("buddies", JSON.stringify(newBuddies));
 
       toast.style = Toast.Style.Success;
       toast.title = "Buddy added";
@@ -244,11 +239,12 @@ export default function Command() {
       style: Toast.Style.Animated,
       title: "Updating buddy...",
     });
-
+    console.log(buddy, index);
     try {
       const newBuddies = [...buddies];
       newBuddies.splice(index, 1, buddy);
-      updateBuddies(newBuddies);
+      setBuddies(newBuddies);
+      await LocalStorage.setItem("buddies", JSON.stringify(newBuddies));
 
       toast.style = Toast.Style.Success;
       toast.title = "Buddy updated";
@@ -265,6 +261,7 @@ export default function Command() {
     if (
       await confirmAlert({
         title: "Delete this buddy?",
+        icon: { source: Icon.Trash, tintColor: Color.Red },
         message: "This action cannot be undone.",
         primaryAction: {
           title: "Delete",
@@ -280,7 +277,8 @@ export default function Command() {
       try {
         const newBuddies = [...buddies];
         newBuddies.splice(index, 1);
-        updateBuddies(newBuddies);
+        setBuddies(newBuddies);
+        await LocalStorage.setItem("buddies", JSON.stringify(newBuddies));
 
         toast.style = Toast.Style.Success;
         toast.title = "Buddy deleted";
@@ -294,35 +292,9 @@ export default function Command() {
     }
   }
 
-  async function moveUp(index: number) {
-    if (index > 0) {
-      const newBuddies = [...buddies];
-      const buddy = newBuddies[index];
-      newBuddies[index] = newBuddies[index - 1];
-      newBuddies[index - 1] = buddy;
-      await updateBuddies(newBuddies);
-    }
-  }
-
-  async function moveDown(index: number) {
-    if (index < buddies.length - 1) {
-      const newBuddies = [...buddies];
-      const buddy = buddies[index];
-      newBuddies[index] = newBuddies[index + 1];
-      newBuddies[index + 1] = buddy;
-      await updateBuddies(newBuddies);
-
-      await updateBuddies(newBuddies);
-    }
-  }
-
   return (
     <List
       isLoading={loading}
-      navigationTitle={`Current Time: ${new Date().toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "numeric",
-      })}`}
       searchBarPlaceholder="Search your buddies..."
       actions={
         <ActionPanel>
@@ -330,53 +302,46 @@ export default function Command() {
         </ActionPanel>
       }
     >
-      {buddies &&
-        buddies.map((buddy, index) => (
-          <List.Item
-            key={buddy.id}
-            title={buddy.name}
-            subtitle={getOffsetForTz(buddy.tz)}
-            icon={{ source: buddy.avatar, mask: Image.Mask.Circle }}
-            accessories={[
-              {
-                text: formatZoneName(buddy.tz),
-              },
-              {
-                tag: {
-                  value: getCurrentTimeForTz(buddy.tz),
-                  color: getColorForTz(buddy.tz),
+      <List.Section
+        title={`Current Time: ${new Date().toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "numeric",
+        })}`}
+      >
+        {buddies &&
+          buddies.map((buddy, index) => (
+            <List.Item
+              key={index}
+              title={buddy.name}
+              subtitle={getOffsetForTz(buddy.tz)}
+              icon={{ source: buddy.avatar, mask: Image.Mask.Circle }}
+              accessories={[
+                {
+                  text: formatZoneName(buddy.tz),
                 },
-                tooltip: getTooltipForTz(buddy.tz),
-                icon: getIconForTz(buddy.tz),
-              },
-            ]}
-            actions={
-              <ActionPanel>
-                <ActionPanel.Section>
-                  <CreateBuddyAction onCreate={handleCreate} />
-                  <EditBuddyAction index={index} buddy={buddy} onUpdate={handleUpdate} />
-                </ActionPanel.Section>
-                <ActionPanel.Section>
-                  <Action
-                    title="Move Up"
-                    icon={Icon.ArrowUp}
-                    shortcut={{ modifiers: ["cmd", "opt"], key: "arrowUp" }}
-                    onAction={() => moveUp(index)}
-                  />
-                  <Action
-                    title="Move Down"
-                    icon={Icon.ArrowDown}
-                    shortcut={{ modifiers: ["cmd", "opt"], key: "arrowDown" }}
-                    onAction={() => moveDown(index)}
-                  />
-                </ActionPanel.Section>
-                <ActionPanel.Section>
-                  <DeleteBuddyAction onDelete={() => handleDelete(index)} />
-                </ActionPanel.Section>
-              </ActionPanel>
-            }
-          />
-        ))}
+                {
+                  tag: {
+                    value: getCurrentTimeForTz(buddy.tz),
+                    color: getColorForTz(buddy.tz),
+                  },
+                  tooltip: getTooltipForTz(buddy.tz),
+                  icon: getIconForTz(buddy.tz),
+                },
+              ]}
+              actions={
+                <ActionPanel>
+                  <ActionPanel.Section>
+                    <CreateBuddyAction onCreate={handleCreate} />
+                    <EditBuddyAction index={index} buddy={buddy} onUpdate={handleUpdate} />
+                  </ActionPanel.Section>
+                  <ActionPanel.Section>
+                    <DeleteBuddyAction onDelete={() => handleDelete(index)} />
+                  </ActionPanel.Section>
+                </ActionPanel>
+              }
+            />
+          ))}
+      </List.Section>
     </List>
   );
 }
